@@ -23,22 +23,17 @@ const CreateTenantScreen = () => {
         newCode = Math.random().toString(36).substring(7).toUpperCase();
       }
       setGeneratedJoinCode(newCode);
+      // Navigate to AdminDashboard and pass the join code as a parameter
       setTimeout(() => {
-        router.push('/AdminDashboard');
+        router.push({
+          pathname: '/AdminDashboard',
+          params: { joinCode: newCode },
+        });
       }, 1000);
     } else {
       alert('Please enter a tenant name, your email, and a password.');
     }
   };
-
-// In the return statement of CreateTenantScreen:
-{generatedJoinCode && (
-  <View style={styles.infoBox}>
-    <Text style={styles.infoText}>Your Private Join Code:</Text>
-    <Text style={styles.codeText}>{generatedJoinCode}</Text>
-    <Text style={styles.infoText}>Share this code with players to join your private tenant.</Text>
-  </View>
-)}
 
   return (
     <View style={styles.container}>
@@ -55,20 +50,14 @@ const CreateTenantScreen = () => {
       </View>
 
       <View style={styles.toggleContainer}>
-  <Text style={styles.label}>Private Tenant?</Text>
-  <Switch
-    value={isPrivateTenant}
-    onValueChange={setIsPrivateTenant}
-  />
-</View>
+        <Text style={styles.label}>Private Tenant?</Text>
+        <Switch
+          value={isPrivateTenant}
+          onValueChange={setIsPrivateTenant}
+        />
+      </View>
 
-{isPrivateTenant && generatedJoinCode && (
-  <View style={styles.infoBox}>
-    <Text style={styles.infoText}>Your Private Join Code:</Text>
-    <Text style={styles.codeText}>{generatedJoinCode}</Text>
-    <Text style={styles.infoText}>Share this code with players to join your private tenant.</Text>
-  </View>
-)}
+      {/* We no longer need to display the join code here */}
 
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Your Email:</Text>
@@ -93,24 +82,24 @@ const CreateTenantScreen = () => {
       </View>
 
       <View style={styles.inputContainer}>
-  <Text style={styles.label}>Your First Name:</Text>
-  <TextInput
-    style={styles.input}
-    placeholder="John"
-    value={coordinatorFirstName}
-    onChangeText={setCoordinatorFirstName}
-  />
-</View>
+        <Text style={styles.label}>Your First Name:</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="John"
+          value={coordinatorFirstName}
+          onChangeText={setCoordinatorFirstName}
+        />
+      </View>
 
-<View style={styles.inputContainer}>
-  <Text style={styles.label}>Your Last Name:</Text>
-  <TextInput
-    style={styles.input}
-    placeholder="Doe"
-    value={coordinatorLastName}
-    onChangeText={setCoordinatorLastName}
-  />
-</View>
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Your Last Name:</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Doe"
+          value={coordinatorLastName}
+          onChangeText={setCoordinatorLastName}
+        />
+      </View>
 
       <TouchableOpacity style={styles.createButton} onPress={handleCreateTenantAndUser}>
         <Text style={styles.buttonText}>Create Tenant & Sign Up</Text>

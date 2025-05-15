@@ -1,25 +1,27 @@
-import { Picker } from '@react-native-picker/picker'; // Import the dropdown component
+import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-
-// Placeholder data for public tenants
-const publicTenants = [
-  { id: 'balboa', name: 'Balboa Tennis Club' },
-  { id: 'citypark', name: 'City Park Courts' },
-  { id: 'riverside', name: 'Riverside Tennis Association' },
-];
+import { useTenantContext } from '../context/TenantContext';
 
 const TenantSelectionScreen = () => {
+  console.log('TenantSelectionScreen rendered');
   const router = useRouter();
-  const [selectedPublicTenant, setSelectedPublicTenant] = React.useState<string | undefined>(undefined); // Changed to undefined
+  const { tenants } = useTenantContext();
+  console.log('Available tenants in TenantSelection:', tenants);
+  const [selectedPublicTenantId, setSelectedPublicTenantId] = React.useState<string | undefined>(undefined);
   const [privateCode, setPrivateCode] = React.useState('');
 
+  const publicTenants = tenants.filter(tenant => tenant.joinCode === null);
+
+  useEffect(() => {
+    console.log('TenantSelectionScreen mounted. Current tenants:', tenants);
+  }, []);
+
   const handleJoinPublicTenant = () => {
-    if (selectedPublicTenant) {
-      console.log(`Joining public tenant: ${selectedPublicTenant}`);
-      // In a real app, you'd proceed to sign-up/login for this tenant
-      router.push(`/SignUp?tenantId=${selectedPublicTenant}&role=player`);
+    if (selectedPublicTenantId) {
+      console.log(`Joining public tenant ID: ${selectedPublicTenantId}`);
+      router.push(`/SignUp?tenantId=${selectedPublicTenantId}&role=player`);
     } else {
       alert('Please select a public tenant.');
     }
@@ -27,9 +29,13 @@ const TenantSelectionScreen = () => {
 
   const handleJoinPrivateTenant = () => {
     if (privateCode) {
-      console.log(`Attempting to join private tenant with code: ${privateCode}`);
-      // In a real app, you'd need to validate this code against your backend
-      router.push(`/SignUp?privateCode=${privateCode}&role=player`);
+      const foundTenant = tenants.find(tenant => tenant.joinCode?.toUpperCase() === privateCode.toUpperCase());
+      if (foundTenant) {
+        console.log(`Attempting to join private tenant with ID: ${foundTenant.id}`);
+        router.push(`/SignUp?tenantId=${foundTenant.id}&role=player`);
+      } else {
+        alert('Invalid private tenant code.');
+      }
     } else {
       alert('Please enter the private tenant code.');
     }
@@ -43,10 +49,10 @@ const TenantSelectionScreen = () => {
         <Text style={styles.sectionTitle}>Public Tenants</Text>
         <View style={styles.pickerContainer}>
           <Picker
-            selectedValue={selectedPublicTenant}
-            onValueChange={(itemValue, itemIndex) => setSelectedPublicTenant(itemValue)}
+            selectedValue={selectedPublicTenantId}
+            onValueChange={(itemValue) => setSelectedPublicTenantId(itemValue)}
           >
-            <Picker.Item label="Select a club or municipality" value={undefined} /> {/* Keep the value as undefined for the default item */}
+            <Picker.Item label="Select a club or municipality" value={undefined} />
             {publicTenants.map((tenant) => (
               <Picker.Item key={tenant.id} label={tenant.name} value={tenant.id} />
             ))}

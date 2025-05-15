@@ -1,9 +1,11 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useTenantContext } from '../context/TenantContext'; // Import useTenantContext
 
 const CreateTenantScreen = () => {
   const router = useRouter();
+  const { addTenant } = useTenantContext(); // Get the addTenant function
   const [tenantName, setTenantName] = React.useState('');
   const [privateJoinCode, setPrivateJoinCode] = React.useState('');
   const [coordinatorEmail, setCoordinatorEmail] = React.useState('');
@@ -11,19 +13,28 @@ const CreateTenantScreen = () => {
   const [coordinatorFirstName, setCoordinatorFirstName] = useState('');
   const [coordinatorLastName, setCoordinatorLastName] = useState('');
   const [isPrivateTenant, setIsPrivateTenant] = React.useState(false);
-
   const [generatedJoinCode, setGeneratedJoinCode] = React.useState<string | null>(null);
 
   const handleCreateTenantAndUser = async () => {
     if (tenantName && coordinatorEmail && coordinatorPassword) {
-      console.log(`Creating tenant: ${tenantName}, private: ${isPrivateTenant}, code: ${generatedJoinCode}, coordinator email: ${coordinatorEmail}, password: ${coordinatorPassword}, firstName: ${coordinatorFirstName}, lastName: ${coordinatorLastName}`);
-      // Simulate backend call
       let newCode = null;
       if (isPrivateTenant) {
         newCode = Math.random().toString(36).substring(7).toUpperCase();
+        setGeneratedJoinCode(newCode);
       }
-      setGeneratedJoinCode(newCode);
-      // Navigate to AdminDashboard and pass the join code as a parameter
+
+      // Add the new tenant to the global state
+      addTenant({
+        name: tenantName,
+        isPrivate: isPrivateTenant,
+        joinCode: newCode,
+        coordinatorEmail: coordinatorEmail,
+        coordinatorFirstName: coordinatorFirstName,
+        coordinatorLastName: coordinatorLastName,
+      });
+      console.log('Tenant data being added:', { tenantName, isPrivateTenant, newCode });
+
+      // Simulate backend call and navigate
       setTimeout(() => {
         router.push({
           pathname: '/AdminDashboard',

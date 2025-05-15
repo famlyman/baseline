@@ -1,5 +1,15 @@
 import { Stack } from "expo-router";
+import { LeagueProvider } from "../context/LeagueContext";
+import { TenantProvider } from "../context/TenantContext";
 
-export default function RootLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+const RootLayout = () => {
+  return (
+    <TenantProvider key="tenantProvider">
+      <LeagueProvider key="leagueProvider">
+        <Stack screenOptions={{ headerShown: false }} />
+      </LeagueProvider>
+    </TenantProvider>
+  );
 }
+
+export default RootLayout;

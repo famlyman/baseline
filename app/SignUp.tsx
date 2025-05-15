@@ -1,5 +1,5 @@
 import { Picker } from '@react-native-picker/picker';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router'; // Import useLocalSearchParams
 import React from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -12,18 +12,22 @@ const publicTenants = [
 
 const SignUpScreen = () => {
   const router = useRouter();
-  const [selectedPublicTenant, setSelectedPublicTenant] = React.useState<string | undefined>(undefined);
-  const [privateCode, setPrivateCode] = React.useState('');
+  const { tenantId, privateCode } = useLocalSearchParams(); // Get the route parameters
+  const [selectedPublicTenant, setSelectedPublicTenant] = React.useState<string | undefined>(tenantId as string | undefined); // Initialize with tenantId if available
+  const [enteredPrivateCode, setEnteredPrivateCode] = React.useState<string | undefined>(privateCode as string | undefined); // Initialize with privateCode if available
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [firstName, setFirstName] = React.useState('');
   const [lastName, setLastName] = React.useState('');
 
   const handleSignUp = () => {
-    const tenantInfo = selectedPublicTenant ? { tenantId: selectedPublicTenant } : privateCode ? { privateCode } : {};
+    const tenantInfo = selectedPublicTenant ? { tenantId: selectedPublicTenant } : enteredPrivateCode ? { privateCode: enteredPrivateCode } : {};
     console.log('Signing up with:', { ...tenantInfo, email, password, firstName, lastName, role: 'player' });
-    // In a real app, you'd send this data to your backend
-    router.push('./(tabs)/Home');
+    // In a real app, you'd send this data to your backend to register the user
+    // and associate them with the tenant.
+
+    // For now, just navigate to the tabs
+    router.push('/(tabs)/Home');
   };
 
   return (
@@ -50,52 +54,12 @@ const SignUpScreen = () => {
         <TextInput
           style={styles.input}
           placeholder="Enter join code"
-          value={privateCode}
-          onChangeText={setPrivateCode}
+          value={enteredPrivateCode}
+          onChangeText={setEnteredPrivateCode}
         />
       </View>
 
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Email:</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="your.email@example.com"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Password:</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="********"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={true}
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>First Name:</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="John"
-          value={firstName}
-          onChangeText={setFirstName}
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Last Name:</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Doe"
-          value={lastName}
-          onChangeText={setLastName}
-        />
-      </View>
+      {/* ... rest of your input fields (email, password, name) ... */}
 
       <TouchableOpacity style={styles.signUpButton} onPress={handleSignUp}>
         <Text style={styles.buttonText}>Sign Up</Text>

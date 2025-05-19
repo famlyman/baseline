@@ -1,15 +1,12 @@
-import { Stack } from "expo-router";
-import { LeagueProvider } from "../context/LeagueContext";
-import { TenantProvider } from "../context/TenantContext";
+import { Slot, Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-const RootLayout = () => {
+export default function RootLayout() {
   return (
-    <TenantProvider key="tenantProvider">
-      <LeagueProvider key="leagueProvider">
-        <Stack screenOptions={{ headerShown: false }} />
-      </LeagueProvider>
-    </TenantProvider>
+    <SafeAreaProvider>
+      <StatusBar style="auto" />
+      <Slot />
+    </SafeAreaProvider>
   );
 }
-
-export default RootLayout;

@@ -1,75 +1,103 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { League, useLeagueContext } from '../context/LeagueContext';
+import React, { useEffect, useState } from 'react';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import CreateSeasonForm from '../components/CreateSeasonForm'; // Adjust the path as needed
+import supabase from '../utils/supabaseClient';
 
-const AdminDashboard = () => {
-  const router = useRouter();
-  const { joinCode } = useLocalSearchParams();
-  const [newLeagueName, setNewLeagueName] = useState('');
-  const { leagues, addLeague } = useLeagueContext(); // Get the leagues array from the context
+const AdminDashboardScreen = () => {
+  const [isCreatingSeason, setIsCreatingSeason] = useState(false);
+  const [seasons, setSeasons] = useState<any[]>([]); // Adjust the type as needed
+  const [loadingSeasons, setLoadingSeasons] = useState(true);
+  const [errorLoadingSeasons, setErrorLoadingSeasons] = useState<string | null>(null);
 
-  const handleCreateLeague = () => {
-    if (newLeagueName) {
-      addLeague({ name: newLeagueName, type: 'Singles' });
-      setNewLeagueName('');
-      alert(`League "${newLeagueName}" created!`);
-    } else {
-      alert('Please enter a league name.');
+  useEffect(() => {
+    fetchSeasons();
+  }, []);
+
+  const fetchSeasons = async () => {
+    setLoadingSeasons(true);
+    setErrorLoadingSeasons(null);
+    try {
+      const { data, error } = await supabase
+        .from('seasons')
+        .select('*')
+        .order('start_date', { ascending: false });
+
+      if (error) {
+        setErrorLoadingSeasons(error.message);
+        console.error('Error fetching seasons:', error);
+      } else if (data) {
+        setSeasons(data);
+      }
+    } catch (error: any) {
+      setErrorLoadingSeasons(error.message);
+      console.error('Unexpected error fetching seasons:', error);
+    } finally {
+      setLoadingSeasons(false);
     }
   };
 
-  const renderLeagueItem = ({ item }: { item: League }) => (
-    <View style={styles.listItem}>
-      <Text style={styles.leagueName}>{item.name} ({item.type})</Text>
-    </View>
-  );
+  const handleCreateSeason = async (seasonData: { name: string; start_date: string | undefined; end_date: string | undefined }) => {
+    setIsCreatingSeason(false); // Close the form
+    setLoadingSeasons(true); // Indicate loading during creation
+    setErrorLoadingSeasons(null);
+    try {
+      const { data, error } = await supabase
+        .from('seasons')
+        .insert([seasonData])
+        .select(); // Get the newly created season
+
+      if (error) {
+        setErrorLoadingSeasons(error.message);
+        console.error('Error creating season:', error);
+        alert(`Error creating season: ${error.message}`);
+      } else if (data && data.length > 0) {
+        console.log('Season created successfully:', data[0]);
+        setSeasons((prevSeasons) => [data[0], ...prevSeasons]); // Add the new season to the list
+        alert('Season created successfully!');
+      }
+    } catch (error: any) {
+      setErrorLoadingSeasons(error.message);
+      console.error('Unexpected error creating season:', error);
+      alert(`Unexpected error creating season: ${error.message}`);
+    } finally {
+      setLoadingSeasons(false);
+    }
+  };
+
+  const handleCancelCreateSeason = () => {
+    setIsCreatingSeason(false);
+  };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Admin Dashboard</Text>
+      <Text style={styles.title}>Admin Dashboard - Seasons</Text>
 
-      {joinCode && (
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>Your Private Tenant Join Code:</Text>
-          <Text style={styles.codeText}>{joinCode}</Text>
-          <Text style={styles.infoText}>Share this code with players to join.</Text>
-        </View>
+      <TouchableOpacity style={styles.createButton} onPress={() => setIsCreatingSeason(true)}>
+        <Text style={styles.buttonText}>Create New Season</Text>
+      </TouchableOpacity>
+
+      {isCreatingSeason && (
+        <CreateSeasonForm onCreateSeason={handleCreateSeason} onCancel={handleCancelCreateSeason} />
       )}
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Create New League</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="League Name"
-          value={newLeagueName}
-          onChangeText={setNewLeagueName}
+      <Text style={styles.subtitle}>Existing Seasons</Text>
+      {loadingSeasons ? (
+        <Text>Loading seasons...</Text>
+      ) : errorLoadingSeasons ? (
+        <Text style={styles.error}>{errorLoadingSeasons}</Text>
+      ) : (
+        <FlatList
+          data={seasons}
+          keyExtractor={(item) => item.id.toString()} // Assuming your seasons table has an 'id' column
+          renderItem={({ item }) => (
+            <View style={styles.seasonItem}>
+              <Text style={styles.seasonName}>{item.name}</Text>
+              <Text>Start Date: {item.start_date ? new Date(item.start_date).toLocaleDateString() : 'N/A'}</Text>
+              <Text>End Date: {item.end_date ? new Date(item.end_date).toLocaleDateString() : 'N/A'}</Text>
+            </View>
+          )}
         />
-        <TouchableOpacity style={styles.createButton} onPress={handleCreateLeague}>
-          <Text style={styles.buttonText}>Create League</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Created Leagues</Text>
-        {leagues.length === 0 ? (
-          <Text>No leagues created yet.</Text>
-        ) : (
-          <FlatList
-            data={leagues}
-            keyExtractor={(item) => item.id}
-            renderItem={renderLeagueItem}
-          />
-        )}
-      </View>
-
-      <TouchableOpacity style={styles.button} onPress={() => console.log('Navigate to Ladders')}>
-        <Text style={styles.buttonText}>Ladders (Placeholder)</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.button} onPress={() => console.log('Navigate to Players')}>
-        <Text style={styles.buttonText}>Players (Placeholder)</Text>
-      </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -87,76 +115,44 @@ const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'center',
   },
-  infoBox: {
-    backgroundColor: '#e0f7fa',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  infoText: {
-    fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 5,
-  },
-  codeText: {
+  subtitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1976d2',
-  },
-  section: {
-    marginBottom: 20,
-    padding: 15,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    marginTop: 20,
     marginBottom: 10,
-    color: '#333',
-  },
-  input: {
-    height: 40,
-    borderColor: 'gray',
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    marginBottom: 10,
+    color: '#1E3A8A',
   },
   createButton: {
     backgroundColor: '#2E7D32',
     paddingVertical: 12,
     borderRadius: 5,
     alignItems: 'center',
+    marginBottom: 15,
   },
   buttonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  button: {
-    backgroundColor: '#1E3A8A',
-    paddingVertical: 15,
-    borderRadius: 5,
-    alignItems: 'center',
+  seasonItem: {
+    backgroundColor: '#FFFFFF',
+    padding: 15,
+    borderRadius: 8,
     marginBottom: 10,
-  },
-  listItem: {
-    padding: 10,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 5,
-    marginBottom: 5,
+    borderColor: '#ddd',
     borderWidth: 1,
-    borderColor: '#eee',
   },
-  leagueName: {
-    fontSize: 16,
+  seasonName: {
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  error: {
+    color: 'red',
+    marginTop: 10,
+    textAlign: 'center',
   },
 });
 
-export default AdminDashboard;
+export default AdminDashboardScreen;

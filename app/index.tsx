@@ -1,10 +1,34 @@
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import courtImage from '../assets/images/court.jpg';
+import supabase from '../utils/supabaseClient'; // Import your Supabase client
 
 const WelcomeScreen = () => {
   const router = useRouter();
+  const [loadingSession, setLoadingSession] = useState(true);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      setLoadingSession(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      setLoadingSession(false);
+
+      if (session) {
+        router.replace('/(tabs)/Home'); // Redirect to your main app route
+      }
+    };
+
+    checkSession();
+  }, [router]);
+
+  if (loadingSession) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Checking session...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -20,6 +44,11 @@ const WelcomeScreen = () => {
         router.push('./(public)/PublicView'); // Navigate to the public view
       }}>
         <Text style={styles.skipButtonText}>Skip</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.loginButton} onPress={() => {
+        router.push('./Login'); // Navigate to the Login screen
+      }}>
+        <Text style={styles.buttonText}>Log In</Text>
       </TouchableOpacity>
     </View>
   );
@@ -68,6 +97,13 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     textDecorationLine: 'underline',
+    marginBottom: 15, // Add some margin
+  },
+  loginButton: {
+    backgroundColor: '#007bff', // Blue
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 5,
   },
 });
 

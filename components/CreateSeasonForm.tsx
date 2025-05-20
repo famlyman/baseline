@@ -1,181 +1,169 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
+// components/CreateSeasonForm.tsx
+import DateTimePicker from '@react-native-community/datetimepicker'; // Required for date pickers
+import { Picker } from '@react-native-picker/picker'; // You'll need to install this: `npx expo install @react-native-picker/picker`
 import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-
-type OnCreateSeasonHandler = (seasonData: {
-  name: string;
-  start_date: string | undefined;
-  end_date: string | undefined;
-}) => void;
-
-type OnCancelHandler = () => void;
+import { Alert, Button, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface CreateSeasonFormProps {
-  onCreateSeason: OnCreateSeasonHandler;
-  onCancel: OnCancelHandler;
+  onCreateSeason: (seasonData: { name: string; start_date: string; end_date?: string; status: string }) => void;
+  onCancel: () => void;
 }
 
 const CreateSeasonForm: React.FC<CreateSeasonFormProps> = ({ onCreateSeason, onCancel }) => {
-  const [seasonName, setSeasonName] = useState('');
+  const [name, setName] = useState('');
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [status, setStatus] = useState('upcoming'); // Default status
+
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
-  const handleStartDateChange = (event: any, selectedDate: Date | undefined) => {
-    setShowStartDatePicker(false);
-    if (selectedDate) {
-      setStartDate(selectedDate);
-    }
-  };
-
-  const handleEndDateChange = (event: any, selectedDate: Date | undefined) => {
-    setShowEndDatePicker(false);
-    if (selectedDate) {
-      setEndDate(selectedDate);
-    }
-  };
-
   const handleSubmit = () => {
-    if (seasonName && startDate) {
-      onCreateSeason({ name: seasonName, start_date: startDate?.toISOString(), end_date: endDate?.toISOString() });
-      setSeasonName('');
-      setStartDate(undefined);
-      setEndDate(undefined);
-    } else {
-      alert('Season Name and Start Date are required.');
+    if (!name || !startDate) {
+      Alert.alert('Validation Error', 'Season Name and Start Date are required.');
+      return;
     }
+
+    onCreateSeason({
+      name,
+      start_date: startDate.toISOString(),
+      end_date: endDate ? endDate.toISOString() : undefined,
+      status,
+    });
+  };
+
+  const onStartDateChange = (event: any, selectedDate: Date | undefined) => {
+    const currentDate = selectedDate || startDate;
+    setShowStartDatePicker(Platform.OS === 'ios');
+    setStartDate(currentDate);
+  };
+
+  const onEndDateChange = (event: any, selectedDate: Date | undefined) => {
+    const currentDate = selectedDate || endDate;
+    setShowEndDatePicker(Platform.OS === 'ios');
+    setEndDate(currentDate);
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Create New Season</Text>
+    <View style={styles.formContainer}>
+      <Text style={styles.formTitle}>Create New Season</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Season Name (e.g., Spring 2025)"
+        value={name}
+        onChangeText={setName}
+      />
 
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Season Name:</Text>
-        <TextInput
-          style={styles.input}
-          value={seasonName}
-          onChangeText={setSeasonName}
-          placeholder="e.g., Spring 2025"
-        />
+      <View style={styles.datePickerRow}>
+        <Text style={styles.label}>Start Date:</Text>
+        <TouchableOpacity onPress={() => setShowStartDatePicker(true)} style={styles.datePickerButton}>
+          <Text>{startDate ? startDate.toLocaleDateString() : 'Select Date'}</Text>
+        </TouchableOpacity>
+        {showStartDatePicker && (
+          <DateTimePicker
+            value={startDate || new Date()}
+            mode="date"
+            display="default"
+            onChange={onStartDateChange}
+          />
+        )}
       </View>
 
-      <View style={styles.datePickerContainer}>
-        <View style={styles.dateInputContainer}>
-          <Text style={styles.label}>Start Date:</Text>
-          <TouchableOpacity style={styles.dateButton} onPress={() => setShowStartDatePicker(true)}>
-            <Text>{startDate ? startDate.toLocaleDateString() : 'Select Start Date'}</Text>
-          </TouchableOpacity>
-          {showStartDatePicker && (
-            <DateTimePicker
-              testID="startDatePicker"
-              value={startDate || new Date()}
-              mode="date"
-              is24Hour={true}
-              display="default"
-              onChange={handleStartDateChange}
-            />
-          )}
-        </View>
-
-        <View style={styles.dateInputContainer}>
-          <Text style={styles.label}>End Date (Optional):</Text>
-          <TouchableOpacity style={styles.dateButton} onPress={() => setShowEndDatePicker(true)}>
-            <Text>{endDate ? endDate.toLocaleDateString() : 'Select End Date (Optional)'}</Text>
-          </TouchableOpacity>
-          {showEndDatePicker && (
-            <DateTimePicker
-              testID="endDatePicker"
-              value={endDate || new Date()}
-              mode="date"
-              is24Hour={true}
-              display="default"
-              onChange={handleEndDateChange}
-            />
-          )}
-        </View>
+      <View style={styles.datePickerRow}>
+        <Text style={styles.label}>End Date (Optional):</Text>
+        <TouchableOpacity onPress={() => setShowEndDatePicker(true)} style={styles.datePickerButton}>
+          <Text>{endDate ? endDate.toLocaleDateString() : 'Select Date'}</Text>
+        </TouchableOpacity>
+        {showEndDatePicker && (
+          <DateTimePicker
+            value={endDate || new Date()}
+            mode="date"
+            display="default"
+            onChange={onEndDateChange}
+          />
+        )}
       </View>
 
-      <View style={styles.buttonGroup}>
-        <TouchableOpacity style={styles.createButton} onPress={handleSubmit}>
-          <Text style={styles.buttonText}>Create Season</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
-          <Text style={styles.buttonText}>Cancel</Text>
-        </TouchableOpacity>
+      <Text style={styles.label}>Season Status:</Text>
+      <View style={styles.pickerContainer}>
+        <Picker
+          selectedValue={status}
+          onValueChange={(itemValue: string) => setStatus(itemValue)}
+        >
+          <Picker.Item label="Upcoming" value="upcoming" />
+          <Picker.Item label="Active" value="active" />
+          <Picker.Item label="Completed" value="completed" />
+          <Picker.Item label="Archived" value="archived" />
+        </Picker>
+      </View>
+
+      <View style={styles.buttonContainer}>
+        <Button title="Create Season" onPress={handleSubmit} />
+        <Button title="Cancel" onPress={onCancel} color="red" />
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  formContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
     padding: 20,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    marginVertical: 10,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  title: {
+  formTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 15,
-    color: '#333',
     textAlign: 'center',
-  },
-  inputContainer: {
-    marginBottom: 15,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 5,
     color: '#333',
   },
   input: {
-    height: 40,
-    borderColor: 'gray',
     borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    backgroundColor: '#FFFFFF',
-  },
-  datePickerContainer: {
+    borderColor: '#ddd',
+    padding: 12,
     marginBottom: 15,
+    borderRadius: 8,
+    fontSize: 16,
   },
-  dateInputContainer: {
-    marginBottom: 10,
-  },
-  dateButton: {
-    height: 40,
-    borderColor: 'gray',
+  datePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+    justifyContent: 'space-between',
+    padding: 10,
     borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    borderColor: '#ddd',
+    borderRadius: 8,
   },
-  buttonGroup: {
+  label: {
+    fontSize: 16,
+    color: '#555',
+    marginRight: 10,
+  },
+  datePickerButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#EFEFEF',
+    borderRadius: 5,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    marginBottom: 15,
+    overflow: 'hidden', // To ensure borderRadius applies to Picker on Android
+  },
+  buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 20,
-  },
-  createButton: {
-    backgroundColor: '#2E7D32',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-  },
-  cancelButton: {
-    backgroundColor: '#B00020',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
+    marginTop: 10,
   },
 });
 

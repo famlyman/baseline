@@ -12,7 +12,20 @@ interface League {
   end_date?: string;
   status: string;
   tenant_id: string;
-  // Add other league fields as needed
+  rating_system: string; // <-- Add rating_system to League interface
+  registration_open_date?: string; // Add if you moved it to league
+  registration_close_date?: string; // Add if you moved it to league
+}
+
+// Update the type for leagueData passed from the form
+interface CreateLeagueFormData {
+  name: string;
+  start_date: string;
+  end_date?: string;
+  status: string;
+  rating_system: string; // <-- Add rating_system here
+  registration_open_date?: Date | null; // Assuming your form passes Date objects or null
+  registration_close_date?: Date | null;
 }
 
 const CreateLeagueScreen = () => {
@@ -66,8 +79,9 @@ const CreateLeagueScreen = () => {
     fetchUserTenantId();
   }, [router]);
 
+  // Update handleCreateLeague to accept CreateLeagueFormData
   const handleCreateLeague = useCallback(async (
-    leagueData: { name: string; start_date: string; end_date?: string; status: string }
+    leagueData: CreateLeagueFormData // <-- Changed type here
   ) => {
     if (!currentTenantId) {
       Alert.alert('Error', 'Tenant ID is not available. Cannot create league.');
@@ -77,19 +91,52 @@ const CreateLeagueScreen = () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: insertError } = await supabase
+      // Ensure dates are in ISO string format if coming from Date objects
+      const startDateISO = leagueData.start_date; // Assuming already string or handle conversion
+      const endDateISO = leagueData.end_date || null;
+      const registrationOpenDateISO = leagueData.registration_open_date ? leagueData.registration_open_date.toISOString() : null;
+      const registrationCloseDateISO = leagueData.registration_close_date ? leagueData.registration_close_date.toISOString() : null;
+
+
+      const { data: newLeague, error: insertError } = await supabase
         .from('leagues')
-        .insert([{ ...leagueData, tenant_id: currentTenantId }])
-        .select();
+        .insert({
+          name: leagueData.name,
+          start_date: startDateISO,
+          end_date: endDateISO,
+          status: leagueData.status,
+          tenant_id: currentTenantId,
+          rating_system: leagueData.rating_system, // <-- Insert rating_system into league
+          registration_open_date: registrationOpenDateISO, // Add if moved to league
+          registration_close_date: registrationCloseDateISO, // Add if moved to league
+        })
+        .select() // Use .select() to get the inserted row
+        .single(); // Use .single() if you expect one row back
 
       if (insertError) {
         setError(insertError.message);
         console.error('Error creating league:', insertError);
         Alert.alert('Error creating league', insertError.message);
-      } else if (data && data.length > 0) {
-        console.log('League created successfully:', data[0]);
-        Alert.alert('Success', 'League created successfully!');
-        router.back(); // Go back to AdminDashboardHome after successful creation
+      } else if (newLeague) { // Check newLeague directly, not data.length
+        console.log('League created successfully:', newLeague);
+
+        // CALL THE RPC TO CREATE DEFAULT DIVISIONS HERE!
+        const { error: rpcError } = await supabase.rpc('create_default_divisions_for_league', {
+          p_league_id: newLeague.id, // ID of the newly created league
+          p_tenant_id: currentTenantId,
+          p_league_rating_system: newLeague.rating_system, // Pass the rating system from the new league
+        });
+
+        if (rpcError) {
+          setError(rpcError.message);
+          console.error('Error creating default divisions:', rpcError);
+          Alert.alert('Error creating default divisions', rpcError.message);
+          // Optional: You might want to delete the newly created league if division creation fails,
+          // or mark it with a special status for admin review. For now, we'll just alert.
+        } else {
+          Alert.alert('Success', 'League and default divisions created successfully!');
+          router.back(); // Go back to AdminDashboardHome after successful creation
+        }
       }
     } catch (err: any) {
       setError(err.message);

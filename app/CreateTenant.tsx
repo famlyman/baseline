@@ -66,7 +66,7 @@ const CreateTenantScreen = () => {
 
       console.log('Tenant and Coordinator profile created successfully! New Tenant ID:', newTenantId);
       Alert.alert('Success', 'Tenant and Coordinator account created successfully!');
-      router.replace('/AdminDashboard');
+      router.replace('/(app)/AdminAreaNavigator');
 
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred during account creation.');

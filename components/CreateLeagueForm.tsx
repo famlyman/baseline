@@ -1,11 +1,21 @@
 // components/CreateLeagueForm.tsx
-import DateTimePicker from '@react-native-community/datetimepicker'; // Required for date pickers
-import { Picker } from '@react-native-picker/picker'; // You'll need to install this: `npx expo install @react-native-picker/picker`
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';
 import React, { useState } from 'react';
 import { Alert, Button, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+// UPDATE INTERFACE: Add rating_system to the leagueData object
 interface CreateLeagueFormProps {
-  onCreateLeague: (leagueData: { name: string; start_date: string; end_date?: string; status: string }) => void;
+  onCreateLeague: (leagueData: {
+    name: string;
+    start_date: string;
+    end_date?: string;
+    status: string;
+    rating_system: string; // <--- ADDED THIS LINE
+    // If you move registration dates here, add them to this interface too:
+    // registration_open_date?: Date | null;
+    // registration_close_date?: Date | null;
+  }) => void;
   onCancel: () => void;
 }
 
@@ -15,20 +25,26 @@ const CreateLeagueForm: React.FC<CreateLeagueFormProps> = ({ onCreateLeague, onC
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [status, setStatus] = useState('upcoming'); // Default status
 
+  // NEW STATE: For the selected rating system
+  const [selectedRatingSystem, setSelectedRatingSystem] = useState('NTRP'); // Default to 'NTRP' or a suitable default
+
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
   const handleSubmit = () => {
-    if (!name || !startDate) {
-      Alert.alert('Validation Error', 'League Name and Start Date are required.');
+    // UPDATE VALIDATION: Include rating_system
+    if (!name || !startDate || !selectedRatingSystem) {
+      Alert.alert('Validation Error', 'League Name, Start Date, and Rating System are required.');
       return;
     }
 
+    // UPDATE onCreateLeague call: Pass the rating_system
     onCreateLeague({
       name,
-      start_date: startDate.toISOString(),
-      end_date: endDate ? endDate.toISOString() : undefined,
+      start_date: startDate.toISOString(), // Ensure ISO string for Supabase
+      end_date: endDate ? endDate.toISOString() : undefined, // Ensure ISO string or undefined
       status,
+      rating_system: selectedRatingSystem, // <--- PASSING THE NEW STATE HERE
     });
   };
 
@@ -97,6 +113,20 @@ const CreateLeagueForm: React.FC<CreateLeagueFormProps> = ({ onCreateLeague, onC
         </Picker>
       </View>
 
+      {/* NEW FIELD: Rating System Picker */}
+      <Text style={styles.label}>Rating System:</Text>
+      <View style={styles.pickerContainer}>
+        <Picker
+          selectedValue={selectedRatingSystem}
+          onValueChange={(itemValue: string) => setSelectedRatingSystem(itemValue)}
+        >
+          <Picker.Item label="NTRP" value="NTRP" />
+          <Picker.Item label="UTR" value="UTR" />
+          <Picker.Item label="Other" value="Other" />
+          {/* Add more rating systems as needed */}
+        </Picker>
+      </View>
+
       <View style={styles.buttonContainer}>
         <Button title="Create League" onPress={handleSubmit} />
         <Button title="Cancel" onPress={onCancel} color="red" />
@@ -158,7 +188,7 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 8,
     marginBottom: 15,
-    overflow: 'hidden', // To ensure borderRadius applies to Picker on Android
+    overflow: 'hidden',
   },
   buttonContainer: {
     flexDirection: 'row',

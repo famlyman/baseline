@@ -1,8 +1,18 @@
-import { Session } from '@supabase/supabase-js'; // Import Session type
+import { Session } from '@supabase/supabase-js';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from 'react-native';
-import supabase from '../../utils/supabaseClient'; // Adjusted path for (tabs) structure
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import supabase from '../../utils/supabaseClient'; // Adjust path if necessary
+
+// Define types for Division and PlayerStanding based on YOUR DIVISIONS SCHEMA
+// Ensure 'status' column is present in your 'divisions' table.
+interface Division {
+  id: string;
+  name: string;
+  league_id: string; // This links to the parent League
+  tenant_id: string;
+  // Add other columns from your 'divisions' table if you need them
+}
 
 interface PlayerStanding {
   player_id: string;
@@ -11,44 +21,33 @@ interface PlayerStanding {
   losses: number;
   draws: number;
   points: number;
-  rank?: number; // Add a rank property for display
+  rank?: number; // Optional, if you calculate rank in frontend or RPC
 }
 
-interface Ladder {
-  id: string;
-  name: string;
-  status: string;
-  created_at: string;
-}
-
-const HomeScreen = () => {
+const Home = () => {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true); // Combines auth and data loading
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [standings, setStandings] = useState<PlayerStanding[]>([]);
-  const [currentLadder, setCurrentLadder] = useState<Ladder | null>(null);
+  const [activeDivisions, setActiveDivisions] = useState<Division[]>([]); // To store active divisions
+  const [standingsByDivision, setStandingsByDivision] = useState<{ [divisionId: string]: PlayerStanding[] }>({});
 
-  // Function to fetch the user's session and then tenant_id and active ladder
   const fetchSessionAndStandings = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // 1. Get the current user session
       const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
 
       if (sessionError || !currentSession || !currentSession.user) {
-        // Not authenticated, redirect to login
-        Alert.alert('Authentication Required', 'Please log in to view your home dashboard.');
-        router.replace('/'); // Redirect to your root (login)
+        Alert.alert('Authentication Required', 'Please log in.');
+        router.replace('/');
         return;
       }
-      setSession(currentSession); // Set session state
+      setSession(currentSession);
 
-      // 2. Fetch user's tenant_id and role
       const { data: userData, error: userProfileError } = await supabase
         .from('users')
-        .select('tenant_id, role') // Fetch role as well, though not strictly used here for display
+        .select('tenant_id')
         .eq('id', currentSession.user.id)
         .maybeSingle();
 
@@ -56,51 +55,42 @@ const HomeScreen = () => {
         throw new Error(userProfileError.message);
       }
       if (!userData || !userData.tenant_id) {
-        throw new Error('User profile or tenant ID not found. Please ensure your profile is set up.');
+        throw new Error('User profile or tenant ID not found. Cannot fetch standings.');
       }
 
       const userTenantId = userData.tenant_id;
 
-      // 3. Find the most recent active ladder for this tenant
-      const { data: laddersData, error: laddersError } = await supabase
-        .from('ladders')
-        .select('id, name, status, created_at')
+      // 1. Fetch all active divisions for the user's tenant
+      const { data: divisionsData, error: divisionsError } = await supabase
+        .from('divisions') // <-- Query 'divisions' table
+        .select('id, name, league_id, tenant_id') // Ensure 'status' column exists in 'divisions'
         .eq('tenant_id', userTenantId)
-        .eq('status', 'active') // Only fetch active ladders
-        .order('created_at', { ascending: false }) // Get the most recent one
-        .limit(1)
-        .maybeSingle();
 
-      if (laddersError) {
-        throw new Error(laddersError.message);
+      if (divisionsError) {
+        throw new Error(divisionsError.message);
       }
 
-      if (!laddersData) {
-        setCurrentLadder(null);
-        setStandings([]);
-        return; // Exit here, no standings to fetch
+      setActiveDivisions(divisionsData || []);
+
+      // 2. Fetch standings for each active division
+      const newStandings: { [divisionId: string]: PlayerStanding[] } = {};
+      for (const division of divisionsData || []) {
+        const { data: standingsData, error: standingsError } = await supabase.rpc('get_division_standings', {
+          p_division_id: division.id, // Parameter should match what your RPC expects
+        });
+
+        if (standingsError) {
+          console.error(`Error fetching standings for division ${division.name}:`, standingsError.message);
+          // Optionally, skip this division or show a specific error
+        } else {
+          newStandings[division.id] = standingsData || [];
+        }
       }
-
-      setCurrentLadder(laddersData);
-
-      // 4. Call the Supabase RPC function to get standings
-      const { data: standingsData, error: rpcError } = await supabase.rpc('get_ladder_standings', { p_ladder_id: laddersData.id });
-
-      if (rpcError) {
-        throw new Error(rpcError.message);
-      }
-
-      const rankedStandings = (standingsData as PlayerStanding[]).map((player, index) => ({
-        ...player,
-        rank: index + 1,
-      }));
-
-      setStandings(rankedStandings);
+      setStandingsByDivision(newStandings);
 
     } catch (err: any) {
       console.error('Error in fetchSessionAndStandings:', err);
-      setError(`Failed to load: ${err.message}`);
-      // For critical errors, consider forcing a logout or redirect
+      setError(`Failed to load standings: ${err.message}`);
       if (err.message.includes('Authentication') || err.message.includes('User not authenticated')) {
         supabase.auth.signOut();
         router.replace('/');
@@ -108,85 +98,86 @@ const HomeScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [router]); // Include router in dependency array
+  }, [router]);
 
   useEffect(() => {
     fetchSessionAndStandings();
 
-    // Set up a listener for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
-      // If session changes (e.g., user logs in/out), re-fetch all data
       if (newSession || _event === 'SIGNED_OUT') {
         fetchSessionAndStandings();
       }
     });
 
-    // Cleanup subscription on component unmount
+    // Realtime subscription for 'divisions' table changes
+    const divisionsChannel = supabase
+      .channel('public:divisions') // <-- Listen to 'divisions' table
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'divisions' }, (payload) => {
+        console.log('Division change detected:', payload);
+        fetchSessionAndStandings(); // Re-fetch on any relevant change
+      })
+      .subscribe();
+
+
     return () => {
       subscription.unsubscribe();
+      supabase.removeChannel(divisionsChannel);
     };
-  }, [fetchSessionAndStandings]); // fetchSessionAndStandings is a stable useCallback
+  }, [fetchSessionAndStandings]);
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
-        <Text style={styles.loadingText}>Loading your dashboard...</Text>
+        <Text style={styles.loadingText}>Loading your active divisions and standings...</Text>
       </View>
     );
   }
 
-  // If no session after loading, it means the user was redirected by fetchSessionAndStandings.
-  // We can render null or a specific message here.
   if (!session) {
-      return null; // The router.replace('/') handles the actual UI change
-  }
-
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Error: {error}</Text>
-        <Text style={styles.detailText}>Please ensure you are part of a tenant and an active ladder exists.</Text>
-        {/* Optional: Add a retry button */}
-        {/* <TouchableOpacity onPress={fetchSessionAndStandings} style={styles.retryButton}>
-            <Text style={styles.buttonText}>Retry</Text>
-        </TouchableOpacity> */}
-      </View>
-    );
+    return null; // Or a login prompt
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Welcome Home!</Text>
-
-      <View style={styles.standingsCard}>
-        <Text style={styles.cardTitle}>
-          {currentLadder ? `${currentLadder.name} Standings` : 'No Active Ladder Standings'}
-        </Text>
-        {standings.length === 0 && !currentLadder ? (
-          <Text style={styles.detailText}>No active ladder found for your tenant. Please contact your coordinator.</Text>
-        ) : standings.length === 0 && currentLadder ? (
-          <Text style={styles.detailText}>No completed matches yet for this ladder.</Text>
-        ) : (
-          <FlatList
-            data={standings}
-            keyExtractor={(item) => item.player_id}
-            renderItem={({ item }) => (
-              <View style={styles.standingItem}>
-                <Text style={styles.rankText}>{item.rank}.</Text>
-                <Text style={styles.playerName}>{item.player_name}</Text>
-                <Text style={styles.statsText}>W:{item.wins} L:{item.losses} D:{item.draws}</Text>
-                <Text style={styles.pointsText}>{item.points} Pts</Text>
-              </View>
-            )}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-          />
-        )}
-      </View>
-
-      {/* Potentially other home screen content here */}
-
+      <Text style={styles.header}>Home</Text>
+      {activeDivisions.length > 0 ? (
+        <FlatList
+          data={activeDivisions}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item: division }) => (
+            <View style={styles.divisionCard}>
+              <Text style={styles.divisionTitle}>{division.name} Standings</Text>
+              {standingsByDivision[division.id] && standingsByDivision[division.id].length > 0 ? (
+                <FlatList
+                  data={standingsByDivision[division.id]}
+                  keyExtractor={(standingItem) => standingItem.player_id}
+                  renderItem={({ item: standing, index }) => (
+                    <View style={styles.standingItem}>
+                      <Text style={styles.rank}>{index + 1}.</Text>
+                      <Text style={styles.playerName}>{standing.player_name}</Text>
+                      <Text style={styles.score}>W:{standing.wins} L:{standing.losses} D:{standing.draws} Pts:{standing.points}</Text>
+                    </View>
+                  )}
+                  ItemSeparatorComponent={() => <View style={styles.standingSeparator} />}
+                />
+              ) : (
+                <Text style={styles.noDataText}>No standings available yet for {division.name}. Start playing!</Text>
+              )}
+            </View>
+          )}
+          ItemSeparatorComponent={() => <View style={styles.divisionSeparator} />}
+        />
+      ) : (
+        <View style={styles.noActiveDivisionContainer}>
+            <Text style={styles.noActiveDivisionText}>No active divisions found for your tenant.</Text>
+            <TouchableOpacity style={styles.button} onPress={() => router.push('/Leagues')}>
+                <Text style={styles.buttonText}>View Leagues & Divisions</Text>
+            </TouchableOpacity>
+        </View>
+      )}
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 };
@@ -228,21 +219,21 @@ const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'center',
   },
-  standingsCard: {
+  divisionCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
     padding: 15,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    marginBottom: 20,
   },
-  cardTitle: {
+  divisionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 10,
     color: '#1E3A8A',
     textAlign: 'center',
   },
@@ -250,44 +241,62 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
-  rankText: {
+  rank: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#555',
-    width: 30, // Fixed width for rank
+    color: '#333',
+    minWidth: 30,
   },
   playerName: {
-    flex: 1, // Takes up remaining space
+    flex: 1,
     fontSize: 16,
     color: '#333',
     marginLeft: 10,
   },
-  statsText: {
+  score: {
     fontSize: 14,
     color: '#666',
-    width: 90, // Fixed width for stats
-    textAlign: 'right',
+    fontWeight: '500',
   },
-  pointsText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1E3A8A',
-    width: 60, // Fixed width for points
-    textAlign: 'right',
-  },
-  separator: {
+  standingSeparator: {
     height: 1,
     backgroundColor: '#eee',
-    marginVertical: 5,
+    marginVertical: 4,
   },
-  detailText: {
+  divisionSeparator: {
+    height: 10, // More space between division cards
+  },
+  noDataText: {
     fontSize: 16,
-    color: '#555',
+    color: '#777',
     textAlign: 'center',
-    marginTop: 10,
+    marginTop: 20,
+  },
+  noActiveDivisionContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+  },
+  noActiveDivisionText: {
+      fontSize: 18,
+      color: '#777',
+      textAlign: 'center',
+      marginBottom: 20,
+  },
+  button: {
+    backgroundColor: '#1E3A8A',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 15,
+  },
+  buttonText: {
+    color: '#fff',
+    textAlign: 'center',
+    fontSize: 16,
   },
 });
 
-export default HomeScreen;
+export default Home;

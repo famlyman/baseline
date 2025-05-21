@@ -1,40 +1,40 @@
-import { Ionicons } from '@expo/vector-icons'; // You'll need to install this: npm install @expo/vector-icons
+import { FontAwesome5 } from '@expo/vector-icons'; // Assuming you use this for icons
 import { Tabs } from 'expo-router';
 
-export default function TabLayout() {
+const TabbedLayout = () => {
   return (
     <Tabs screenOptions={{ headerShown: false }}>
       <Tabs.Screen
         name="Home"
         options={{
-          tabBarLabel: 'Home',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
-          ),
-          headerTitle: 'Home', // Optional header title
+          title: 'Home',
+          tabBarIcon: ({ color }) => <FontAwesome5 name="home" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="Leagues"
+        name="Leagues" // This is your Leagues.tsx, displaying top-level leagues
         options={{
-          tabBarLabel: 'Leagues',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="list-outline" size={size} color={color} />
-          ),
-          headerTitle: 'Leagues', // Optional header title
+          title: 'Leagues',
+          tabBarIcon: ({ color }) => <FontAwesome5 name="trophy" size={24} color={color} />, // Example icon
+        }}
+      />
+      <Tabs.Screen
+        name="leagues/[id]"
+        options={{
+          title: 'League Details',
+          headerShown: true,
+          tabBarButton: () => null, // Hide this from the tab bar itself, it's navigated to
         }}
       />
       <Tabs.Screen
         name="Profile"
         options={{
-          tabBarLabel: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
-          ),
-          headerTitle: 'Profile', // Optional header title
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <FontAwesome5 name="user" size={24} color={color} />,
         }}
       />
-      {/* You can add more tabs here */}
     </Tabs>
   );
-}
+};
+
+export default TabbedLayout;

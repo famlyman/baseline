@@ -1,15 +1,15 @@
-// components/CreateSeasonForm.tsx
+// components/CreateLeagueForm.tsx
 import DateTimePicker from '@react-native-community/datetimepicker'; // Required for date pickers
 import { Picker } from '@react-native-picker/picker'; // You'll need to install this: `npx expo install @react-native-picker/picker`
 import React, { useState } from 'react';
 import { Alert, Button, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-interface CreateSeasonFormProps {
-  onCreateSeason: (seasonData: { name: string; start_date: string; end_date?: string; status: string }) => void;
+interface CreateLeagueFormProps {
+  onCreateLeague: (leagueData: { name: string; start_date: string; end_date?: string; status: string }) => void;
   onCancel: () => void;
 }
 
-const CreateSeasonForm: React.FC<CreateSeasonFormProps> = ({ onCreateSeason, onCancel }) => {
+const CreateLeagueForm: React.FC<CreateLeagueFormProps> = ({ onCreateLeague, onCancel }) => {
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
@@ -20,11 +20,11 @@ const CreateSeasonForm: React.FC<CreateSeasonFormProps> = ({ onCreateSeason, onC
 
   const handleSubmit = () => {
     if (!name || !startDate) {
-      Alert.alert('Validation Error', 'Season Name and Start Date are required.');
+      Alert.alert('Validation Error', 'League Name and Start Date are required.');
       return;
     }
 
-    onCreateSeason({
+    onCreateLeague({
       name,
       start_date: startDate.toISOString(),
       end_date: endDate ? endDate.toISOString() : undefined,
@@ -46,10 +46,10 @@ const CreateSeasonForm: React.FC<CreateSeasonFormProps> = ({ onCreateSeason, onC
 
   return (
     <View style={styles.formContainer}>
-      <Text style={styles.formTitle}>Create New Season</Text>
+      <Text style={styles.formTitle}>Create New League</Text>
       <TextInput
         style={styles.input}
-        placeholder="Season Name (e.g., Spring 2025)"
+        placeholder="League Name (e.g., Spring 2025)"
         value={name}
         onChangeText={setName}
       />
@@ -84,7 +84,7 @@ const CreateSeasonForm: React.FC<CreateSeasonFormProps> = ({ onCreateSeason, onC
         )}
       </View>
 
-      <Text style={styles.label}>Season Status:</Text>
+      <Text style={styles.label}>League Status:</Text>
       <View style={styles.pickerContainer}>
         <Picker
           selectedValue={status}
@@ -98,7 +98,7 @@ const CreateSeasonForm: React.FC<CreateSeasonFormProps> = ({ onCreateSeason, onC
       </View>
 
       <View style={styles.buttonContainer}>
-        <Button title="Create Season" onPress={handleSubmit} />
+        <Button title="Create League" onPress={handleSubmit} />
         <Button title="Cancel" onPress={onCancel} color="red" />
       </View>
     </View>
@@ -167,4 +167,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CreateSeasonForm;
+export default CreateLeagueForm;

@@ -1,7 +1,7 @@
 import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTenantContext } from '../context/TenantContext';
 
 const TenantSelectionScreen = () => {
@@ -42,48 +42,60 @@ const TenantSelectionScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Select a Tenant</Text>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+    >
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.title}>Select a Tenant</Text>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Public Tenants</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={selectedPublicTenantId}
-            onValueChange={(itemValue) => setSelectedPublicTenantId(itemValue)}
-          >
-            <Picker.Item label="Select a club or municipality" value={undefined} />
-            {publicTenants.map((tenant) => (
-              <Picker.Item key={tenant.id} label={tenant.name} value={tenant.id} />
-            ))}
-          </Picker>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Public Tenants</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={selectedPublicTenantId}
+              onValueChange={(itemValue) => setSelectedPublicTenantId(itemValue)}
+            >
+              <Picker.Item label="Select a club or municipality" value={undefined} />
+              {publicTenants.map((tenant) => (
+                <Picker.Item key={tenant.id} label={tenant.name} value={tenant.id} />
+              ))}
+            </Picker>
+          </View>
+          <TouchableOpacity style={styles.joinButton} onPress={handleJoinPublicTenant}>
+            <Text style={styles.buttonText}>Join Public Tenant</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.joinButton} onPress={handleJoinPublicTenant}>
-          <Text style={styles.buttonText}>Join Public Tenant</Text>
-        </TouchableOpacity>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Join Private Tenant</Text>
-        <TextInput
-          style={styles.privateCodeInput}
-          placeholder="Enter join code"
-          value={privateCode}
-          onChangeText={setPrivateCode}
-        />
-        <TouchableOpacity style={styles.joinButton} onPress={handleJoinPrivateTenant}>
-          <Text style={styles.buttonText}>Join Private Tenant</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Join Private Tenant</Text>
+          <TextInput
+            style={styles.privateCodeInput}
+            placeholder="Enter join code"
+            value={privateCode}
+            onChangeText={setPrivateCode}
+          />
+          <TouchableOpacity style={styles.joinButton} onPress={handleJoinPrivateTenant}>
+            <Text style={styles.buttonText}>Join Private Tenant</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#F5F5F5',
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    padding: 20,
   },
   title: {
     fontSize: 22,
@@ -117,7 +129,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   joinButton: {
-    backgroundColor: '#2E7D32', // Tennis Green
+    backgroundColor: '#2E7D32',
     paddingVertical: 15,
     borderRadius: 5,
     alignItems: 'center',

@@ -81,30 +81,31 @@ const SignUpScreen = () => {
       if (authError) {
         setError(authError.message);
         console.error('Error signing up:', authError);
-      } else {
-        console.log('Sign up authData:', authData);
-        if (authData?.user?.id) {
-          console.log('User ID from auth (SignUp):', authData.user.id);
-          console.log('Role to be inserted (SignUp):', role);
-          // Insert role into the user_roles table
-          const { data: roleInsertData, error: roleError } = await supabase
-            .from('user_roles')
-            .insert({ user_id: authData.user.id, role })
-            .select(); // Add .select() to log the inserted data
-  
-          console.log('Role insert response (SignUp):', roleInsertData); // Log the response
-  
-          if (roleError) {
-            setError(roleError.message);
-            console.error('Error inserting role (SignUp):', roleError);
-            await supabase.auth.signOut();
-          } else {
-            console.log('Role inserted successfully (SignUp) for user:', authData.user.id, 'Role:', role);
-            router.replace('/(tabs)/Home');
-          }
+      } else if (authData?.user?.id) {
+        console.log('User signed up, updating user profile with role...');
+        
+        // Update the user's profile with their role in the users table
+        const { error: profileError } = await supabase
+          .from('users')
+          .update({ 
+            first_name: firstName,
+            last_name: lastName,
+            role: role,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', authData.user.id);
+          
+        if (profileError) {
+          console.error('Error updating user profile:', profileError);
+          setError('Error completing registration. Please contact support.');
+          await supabase.auth.signOut();
         } else {
-          console.log('authData.user.id is undefined after signup (SignUp).');
+          console.log('User profile updated with role:', role);
+          router.replace('/(tabs)/Home');
         }
+      } else {
+        console.error('Unexpected error: No user data returned after signup');
+        setError('An unexpected error occurred. Please try again.');
       }
     } catch (err: any) {
       setError(err.message);
@@ -215,8 +216,11 @@ const SignUpScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#F5F5F5',
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    padding: 20,
   },
   title: {
     fontSize: 22,

@@ -1,8 +1,7 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import CreateLeagueForm from '../components/CreateLeagueForm';
-import supabase from '../utils/supabaseClient';
+import supabase from '../../../utils/supabaseClient'; // Adjust path
 
 // Define types for better type safety
 interface Tenant {
@@ -23,9 +22,8 @@ interface League {
   // Add other league fields as needed
 }
 
-const AdminDashboardScreen = () => {
+const AdminDashboardHome = () => {
   const router = useRouter();
-  const [isCreatingLeague, setIsCreatingLeague] = useState(false);
   const [leagues, setLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,23 +41,27 @@ const AdminDashboardScreen = () => {
       }
 
       // Fetch user's tenant_id from public.users table
-      // Use .maybeSingle() to handle cases where the user's entry might not exist yet
       const { data: userData, error: userProfileError } = await supabase
         .from('users')
-        .select('tenant_id') // Only need tenant_id for now
+        .select('tenant_id, role') // Also fetch role to verify admin status
         .eq('id', user.id)
-        .maybeSingle(); // <--- CHANGED THIS TO .maybeSingle()
+        .maybeSingle();
 
       if (userProfileError) {
         throw new Error(userProfileError.message);
       }
 
-      // If userData is null, it means no profile was found for this user in public.users
       if (!userData || !userData.tenant_id) {
-        // This is the crucial check: If user profile is missing, throw an error
-        throw new Error('User profile or tenant ID not found in database. Please ensure your profile is set up correctly (e.g., re-sign up or check user data).');
+        throw new Error('User profile or tenant ID not found in database. Please ensure your profile is set up correctly.');
       }
       
+      // Essential check for access control
+      if (userData.role !== 'coordinator') {
+        Alert.alert('Access Denied', 'You are not authorized to view this section.');
+        router.replace('../(tabs)/home'); // Navigate non-coordinators away
+        return;
+      }
+
       setCurrentTenantId(userData.tenant_id);
 
       // Fetch the actual tenant details using the tenant_id
@@ -67,7 +69,7 @@ const AdminDashboardScreen = () => {
         .from('tenants')
         .select('id, name, is_private, join_code')
         .eq('id', userData.tenant_id)
-        .single(); // This should still be .single() as tenant_id should be unique and always exist
+        .single();
 
       if (tenantDetailsError || !tenantData) {
         throw new Error(tenantDetailsError?.message || 'Tenant details not found.');
@@ -77,45 +79,52 @@ const AdminDashboardScreen = () => {
     } catch (err: any) {
       console.error('Error in fetchTenantAndUserData:', err);
       setError(`Failed to load user/tenant data: ${err.message}`);
-      Alert.alert('Load Error', `Failed to load user/tenant data: ${err.message}`);
+      // For initial load errors, force logout is often best
+      Alert.alert('Load Error', `Failed to load user/tenant data: ${err.message}`, [
+        { text: 'OK', onPress: async () => { await supabase.auth.signOut(); router.replace('/'); } }
+      ]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [router]); // Include router in dependency array
 
   const fetchLeagues = useCallback(async () => {
     if (!currentTenantId) return;
-
-    setLoading(true);
-    setError(null);
+    
+    // Loading for leagues only, not the whole dashboard
+    // setLoading(true); // Don't set global loading here, only for leagues list
+    
     try {
       const { data, error: leaguesError } = await supabase
         .from('leagues')
-        .select('id, name, start_date, end_date, status, tenant_id')
+        .select('*')
         .eq('tenant_id', currentTenantId)
         .order('start_date', { ascending: false });
 
       if (leaguesError) {
         throw new Error(leaguesError.message);
-      } else if (data) {
+      }
+      if (data) {
         setLeagues(data as League[]);
       }
     } catch (err: any) {
       console.error('Error fetching leagues:', err);
       setError(`Error loading leagues: ${err.message}`);
     } finally {
-      setLoading(false);
+      // setLoading(false); // Don't set global loading here
     }
   }, [currentTenantId]);
 
+  // Initial fetch of tenant and user data
   useEffect(() => {
     fetchTenantAndUserData();
   }, [fetchTenantAndUserData]);
 
+  // Fetch leagues and set up realtime subscription once currentTenantId is available
   useEffect(() => {
     if (currentTenantId) {
       fetchLeagues();
-
+      
       // --- Realtime Subscriptions ---
       const tenantChannel = supabase
         .channel(`public:tenants:id=eq.${currentTenantId}`)
@@ -132,6 +141,7 @@ const AdminDashboardScreen = () => {
           setLeagues(prevLeagues => {
             const newLeague = payload.new as League;
             const oldLeague = payload.old as League;
+            
             switch (payload.eventType) {
               case 'INSERT':
                 return [newLeague, ...prevLeagues];
@@ -153,31 +163,6 @@ const AdminDashboardScreen = () => {
     }
   }, [currentTenantId, fetchLeagues]);
 
-  const handleCreateLeague = () => {
-    router.push('/(app)/screens/CreateLeagueScreen');
-  };
-
-  const handleCancelCreateLeague = () => {
-    setIsCreatingLeague(false);
-  };
-
-  const handleLogout = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { error: logoutError } = await supabase.auth.signOut();
-      if (logoutError) {
-        throw new Error(logoutError.message);
-      }
-      router.replace('/Login');
-    } catch (err: any) {
-      console.error('Logout error:', err);
-      setError(`Logout failed: ${err.message}`);
-      Alert.alert('Logout Error', `Failed to log out: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -192,7 +177,8 @@ const AdminDashboardScreen = () => {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.errorButton} onPress={handleLogout}>
+        {/* The logout button here is for error recovery, keep it for now */}
+        <TouchableOpacity style={styles.errorButton} onPress={async () => { await supabase.auth.signOut(); router.replace('/'); }}>
           <Text style={styles.buttonText}>Go to Login / Logout</Text>
         </TouchableOpacity>
       </View>
@@ -214,13 +200,10 @@ const AdminDashboardScreen = () => {
         </View>
       )}
 
-      <TouchableOpacity style={styles.createButton} onPress={handleCreateLeague}>
+      {/* Button to navigate to the new Create League Screen */}
+      <TouchableOpacity style={styles.createButton} onPress={() => router.push('/(app)/screens/CreateLeagueScreen')}>
         <Text style={styles.buttonText}>Create New League</Text>
       </TouchableOpacity>
-
-      {isCreatingLeague && (
-        <CreateLeagueForm onCreateLeague={handleCreateLeague} onCancel={handleCancelCreateLeague} />
-      )}
 
       <Text style={styles.subtitle}>Your Leagues</Text>
       {leagues.length === 0 ? (
@@ -228,7 +211,7 @@ const AdminDashboardScreen = () => {
       ) : (
         <FlatList
           data={leagues}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <View style={styles.leagueItem}>
               <Text style={styles.leagueName}>{item.name}</Text>
@@ -240,9 +223,7 @@ const AdminDashboardScreen = () => {
         />
       )}
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.buttonText}>Logout</Text>
-      </TouchableOpacity>
+      {/* Removed the Logout Button from the main dashboard content as requested */}
     </View>
   );
 };
@@ -346,13 +327,6 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 5,
   },
-  logoutButton: {
-    backgroundColor: '#DC3545', // Red
-    paddingVertical: 15,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginTop: 20,
-  },
 });
 
-export default AdminDashboardScreen;
+export default AdminDashboardHome;

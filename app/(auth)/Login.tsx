@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import supabase from '../../utils/supabaseClient';
 
 const LoginScreen = () => {
@@ -15,19 +15,20 @@ const LoginScreen = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.id) {
         console.log("Session user ID on load:", session.user.id); // Added logging
-        //  Query the user_roles table
-        const { data: rolesData, error: rolesError } = await supabase
-          .from('user_roles')
+        // Query the users table for the role
+        const { data: userData, error: userError } = await supabase
+          .from('users')
           .select('role')
-          .eq('user_id', session.user.id)
-          .single(); //  Expect a single role
+          .eq('id', session.user.id)
+          .single();
 
-        if (rolesError) {
-          console.error("Error fetching role on initial session check", rolesError);
-          //  Don't show error to user, just log it.  The login will handle it.
+        if (userError) {
+          console.error("Error fetching user data on session check:", userError);
+          return;
         }
-        else if (rolesData?.role) {
-          const role = rolesData.role;
+        
+        if (userData?.role) {
+          const role = userData.role;
           if (role === 'coordinator') {
             router.replace('/AdminDashboard');
           } else {
@@ -64,25 +65,25 @@ const LoginScreen = () => {
 
       if (data?.user?.id) {
         console.log("Logged in user ID:", data.user.id); // Added logging
-        // Query the user_roles table to get the role
-        const { data: rolesData, error: rolesError } = await supabase
-          .from('user_roles')
+        // Query the users table to get the role
+        const { data: userData, error: userError } = await supabase
+          .from('users')
           .select('role')
-          .eq('user_id', data.user.id)
-          .single(); // Expect a single role
+          .eq('id', data.user.id)
+          .single();
 
-        if (rolesError) {
-          setError(rolesError.message);
-          console.error('Error fetching role:', rolesError);
+        if (userError) {
+          setError('Error fetching user information');
+          console.error('Error fetching user data:', userError);
           setLoading(false);
-          return; // IMPORTANT: Return after setting error
+          return;
         }
 
-        if (rolesData?.role) {
-          const role = rolesData.role;
+        if (userData?.role) {
+          const role = userData.role;
           console.log('Login successful. Role:', role, data);
           if (role === 'coordinator') {
-            router.replace('/AdminDashboard');
+            router.replace('../(app)/AdminAreaNavigator');
           } else {
             router.replace('/(tabs)/Home');
           }
@@ -102,8 +103,16 @@ const LoginScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Log In</Text>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+    >
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.title}>Log In</Text>
 
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Email:</Text>
@@ -150,18 +159,22 @@ const LoginScreen = () => {
         <Text style={styles.signUpText}>
           Don't have an account? Sign Up
         </Text>
-      </TouchableOpacity>
-    </View>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
     backgroundColor: '#F5F5F5',
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 20,
+    alignItems: 'center',
   },
   title: {
     fontSize: 24,

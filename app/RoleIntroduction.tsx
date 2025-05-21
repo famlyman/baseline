@@ -22,7 +22,7 @@ const RoleIntroductionScreen = () => {
       </TouchableOpacity>
       <TouchableOpacity style={styles.roleCard} onPress={handleCoordinatorSelect}>
         <Text style={styles.roleTitle}>Coordinator</Text>
-        <Text style={styles.roleDescription}>Manage seasons, leagues, and players.</Text>
+        <Text style={styles.roleDescription}>Manage leagues and players.</Text>
       </TouchableOpacity>
     </View>
   );

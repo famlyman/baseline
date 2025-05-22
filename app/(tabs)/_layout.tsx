@@ -1,4 +1,4 @@
-import { FontAwesome5 } from '@expo/vector-icons'; // Assuming you use this for icons
+import { FontAwesome5 } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
 const TabbedLayout = () => {
@@ -12,18 +12,16 @@ const TabbedLayout = () => {
         }}
       />
       <Tabs.Screen
-        name="Leagues" // This is your Leagues.tsx, displaying top-level leagues
+        name="leagues"
         options={{
           title: 'Leagues',
-          tabBarIcon: ({ color }) => <FontAwesome5 name="trophy" size={24} color={color} />, // Example icon
+          tabBarIcon: ({ color }) => <FontAwesome5 name="trophy" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="leagues/[id]"
+        name="divisions"
         options={{
-          title: 'League Details',
-          headerShown: true,
-          tabBarButton: () => null, // Hide this from the tab bar itself, it's navigated to
+          href: null, // This hides the divisions tab from the tab bar
         }}
       />
       <Tabs.Screen

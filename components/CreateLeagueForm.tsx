@@ -121,9 +121,8 @@ const CreateLeagueForm: React.FC<CreateLeagueFormProps> = ({ onCreateLeague, onC
           onValueChange={(itemValue: string) => setSelectedRatingSystem(itemValue)}
         >
           <Picker.Item label="NTRP" value="NTRP" />
+          <Picker.Item label="ITF" value="ITF" />
           <Picker.Item label="UTR" value="UTR" />
-          <Picker.Item label="Other" value="Other" />
-          {/* Add more rating systems as needed */}
         </Picker>
       </View>
 

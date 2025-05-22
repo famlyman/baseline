@@ -81,23 +81,26 @@ const CreateLeagueScreen = () => {
 
   // Update handleCreateLeague to accept CreateLeagueFormData
   const handleCreateLeague = useCallback(async (
-    leagueData: CreateLeagueFormData // <-- Changed type here
+    leagueData: CreateLeagueFormData
   ) => {
     if (!currentTenantId) {
       Alert.alert('Error', 'Tenant ID is not available. Cannot create league.');
       return;
     }
-
+  
     setLoading(true);
     setError(null);
     try {
-      // Ensure dates are in ISO string format if coming from Date objects
-      const startDateISO = leagueData.start_date; // Assuming already string or handle conversion
+      const startDateISO = leagueData.start_date;
       const endDateISO = leagueData.end_date || null;
       const registrationOpenDateISO = leagueData.registration_open_date ? leagueData.registration_open_date.toISOString() : null;
       const registrationCloseDateISO = leagueData.registration_close_date ? leagueData.registration_close_date.toISOString() : null;
-
-
+  
+      // <--- ADD THIS LINE HERE ---
+      console.log('Sending league data with rating_system:', leagueData.rating_system);
+      console.log('Type of rating_system:', typeof leagueData.rating_system);
+      // --- END ADDED LINES ---
+  
       const { data: newLeague, error: insertError } = await supabase
         .from('leagues')
         .insert({
@@ -106,12 +109,12 @@ const CreateLeagueScreen = () => {
           end_date: endDateISO,
           status: leagueData.status,
           tenant_id: currentTenantId,
-          rating_system: leagueData.rating_system, // <-- Insert rating_system into league
-          registration_open_date: registrationOpenDateISO, // Add if moved to league
-          registration_close_date: registrationCloseDateISO, // Add if moved to league
+          rating_system: leagueData.rating_system,
+          registration_open_date: registrationOpenDateISO,
+          registration_close_date: registrationCloseDateISO,
         })
-        .select() // Use .select() to get the inserted row
-        .single(); // Use .single() if you expect one row back
+        .select()
+        .single();
 
       if (insertError) {
         setError(insertError.message);

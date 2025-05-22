@@ -1,7 +1,8 @@
 import { Session } from '@supabase/supabase-js';
-import { useLocalSearchParams, useRouter } from 'expo-router'; // Import useLocalSearchParams
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context'; // Import SafeAreaView
 import supabase from '../../../utils/supabaseClient'; // Adjusted path for (tabs)/leagues/[id] structure
 
 interface PlayerStanding {
@@ -21,7 +22,8 @@ interface Division {
   league_id: string; // Now refers to the new 'leagues' table
   tenant_id: string;
   created_at: string;
-  type: string;
+  type: 'Singles' | 'Doubles' | 'Mixed'; // Make this specific
+  gender: 'Men\'s' | 'Women\'s' | null; // Make this specific, match Home.tsx
   rating_system: string;
   ruleset: any;
   max_teams: number;
@@ -29,17 +31,18 @@ interface Division {
   registration_close_date: string;
 }
 
-const LeagueDetailsScreen = () => { // Renamed component for clarity
+const LeagueDetailsScreen = () => {
   const router = useRouter();
-  const { id: leagueId } = useLocalSearchParams(); // Get the league ID from the URL
+  const { id: leagueId } = useLocalSearchParams();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [divisions, setDivisions] = useState<Division[]>([]); // List of divisions in this league
-  const [currentLeagueName, setCurrentLeagueName] = useState<string>(''); // To display league name
+  const [divisions, setDivisions] = useState<Division[]>([]);
+  const [currentLeagueName, setCurrentLeagueName] = useState<string>('');
 
-  // State to hold standings for a *selected* division (if you want to show one by default or expand)
-  // For simplicity, we'll just list divisions for now. You might add a separate screen for division standings.
+  // New state for the selected filter type, same as Home.tsx
+  const [selectedFilter, setSelectedFilter] = useState<'All' | 'Men\'s' | 'Women\'s' | 'Mixed'>('All');
+
 
   const fetchLeagueDetailsAndDivisions = useCallback(async () => {
     if (!leagueId) {
@@ -91,9 +94,9 @@ const LeagueDetailsScreen = () => { // Renamed component for clarity
 
       // 2. Fetch all divisions for this specific league_id and tenant_id
       const { data: divisionsData, error: divisionsError } = await supabase
-        .from('divisions') // Now fetching from the 'divisions' table
-        .select('id, name, league_id, tenant_id, created_at, type, rating_system, ruleset, max_teams, registration_open_date, registration_close_date')
-        .eq('league_id', leagueId) // Filter by the league ID from URL
+        .from('divisions')
+        .select('id, name, league_id, tenant_id, created_at, type, rating_system, ruleset, max_teams, registration_open_date, registration_close_date, gender') // ADD gender here
+        .eq('league_id', leagueId)
         .eq('tenant_id', userTenantId)
         .order('created_at', { ascending: false });
 
@@ -113,7 +116,7 @@ const LeagueDetailsScreen = () => { // Renamed component for clarity
     } finally {
       setLoading(false);
     }
-  }, [leagueId, router]); // Dependency on leagueId
+  }, [leagueId, router]); // Dependency on leagueId, router
 
   useEffect(() => {
     fetchLeagueDetailsAndDivisions();
@@ -126,9 +129,10 @@ const LeagueDetailsScreen = () => { // Renamed component for clarity
       }
     });
 
-    // Realtime subscription for 'divisions' table changes related to this league (more complex to filter in client, refetch for simplicity)
+    // Realtime subscription for 'divisions' table changes related to this league
+    // Using `filter` for more efficient real-time updates
     const divisionsChannel = supabase
-        .channel(`public:divisions:league_id=eq.${leagueId}`) // Listen to changes only for this league ID
+        .channel(`public:divisions:league_id=eq.${leagueId}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'divisions', filter: `league_id=eq.${leagueId}` }, (payload) => {
             console.log('Division change detected for this league:', payload);
             fetchLeagueDetailsAndDivisions();
@@ -141,11 +145,26 @@ const LeagueDetailsScreen = () => { // Renamed component for clarity
     };
   }, [fetchLeagueDetailsAndDivisions, leagueId]);
 
+  // Filtered divisions based on selectedFilter (same logic as Home.tsx)
+  const filteredDivisions = divisions.filter(division => {
+    if (selectedFilter === 'All') {
+      return true;
+    }
+    if (selectedFilter === 'Mixed') {
+      return division.type === 'Mixed';
+    }
+    if (selectedFilter === 'Men\'s') {
+      return division.gender === 'Men\'s' && (division.type === 'Singles' || division.type === 'Doubles');
+    }
+    if (selectedFilter === 'Women\'s') {
+      return division.gender === 'Women\'s' && (division.type === 'Singles' || division.type === 'Doubles');
+    }
+    return false;
+  });
 
-  // You might want to navigate to a screen to view standings for a specific division
   const handleViewDivisionStandings = (divisionId: string) => {
-    // router.push(`/divisions/${divisionId}/standings`); // Example route
-    Alert.alert("Coming Soon", `View standings for division: ${divisionId}`);
+    // Navigate to the specific division standings, e.g., using Expo Router's dynamic segments
+    router.push(`/divisions/${divisionId}`); // Assuming you'll create a screen at this path
   };
 
 
@@ -159,7 +178,7 @@ const LeagueDetailsScreen = () => { // Renamed component for clarity
   }
 
   if (!session) {
-      return null;
+    return null;
   }
 
   if (error) {
@@ -175,37 +194,64 @@ const LeagueDetailsScreen = () => { // Renamed component for clarity
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>{currentLeagueName || 'League'} Divisions</Text>
+    <SafeAreaView style={styles.safeArea}> 
+      <View style={styles.container}>
+        <Text style={styles.header}>{currentLeagueName || 'League'} Divisions</Text>
 
-      {divisions.length === 0 ? (
-        <Text style={styles.noDataText}>No divisions found for this league. An admin needs to create them.</Text>
-      ) : (
-        <FlatList
-          data={divisions}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.divisionItem} onPress={() => handleViewDivisionStandings(item.id)}>
-              <Text style={styles.divisionName}>{item.name}</Text>
-              <Text style={styles.divisionDetail}>Type: {item.type}</Text>
-              {/* You might add more details from your division schema here */}
-              <Text style={styles.viewStandingsButtonText}>View Standings</Text>
+        <View style={styles.filterContainer}>
+          {['All', 'Men\'s', 'Women\'s', 'Mixed'].map((filterType) => (
+            <TouchableOpacity
+              key={filterType}
+              style={[
+                styles.filterButton,
+                selectedFilter === filterType && styles.filterButtonActive,
+              ]}
+              onPress={() => setSelectedFilter(filterType as 'All' | 'Men\'s' | 'Women\'s' | 'Mixed')}
+            >
+              <Text style={[
+                styles.filterButtonText,
+                selectedFilter === filterType && styles.filterButtonTextActive,
+              ]}>
+                {filterType}
+              </Text>
             </TouchableOpacity>
-          )}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
-      )}
-    </View>
+          ))}
+        </View>
+
+
+        {filteredDivisions.length === 0 ? ( // Use filteredDivisions here
+          <Text style={styles.noDataText}>No divisions found for this league with the current filter.</Text>
+        ) : (
+          <FlatList
+            data={filteredDivisions} // Use filtered data
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.divisionItem} onPress={() => handleViewDivisionStandings(item.id)}>
+                <Text style={styles.divisionName}>{item.name}</Text>
+                <Text style={styles.divisionDetail}>Type: {item.type}</Text>
+                {item.gender && <Text style={styles.divisionDetail}>Gender: {item.gender}</Text>}
+                <Text style={styles.viewStandingsButtonText}>View Standings</Text>
+              </TouchableOpacity>
+            )}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+          />
+        )}
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: { // Add this style for SafeAreaView
+    flex: 1,
+    backgroundColor: '#F5F5F5', // Match your container background
+  },
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 20, // Adjust padding if needed, SafeAreaView handles top/bottom
+    paddingTop: 10, // Add a bit of padding below the header if needed
   },
-  detailText: { // ADD THIS STYLE
+  detailText: {
     fontSize: 16,
     color: '#555',
     textAlign: 'center',
@@ -294,6 +340,33 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
     fontSize: 16,
+  },
+  // New styles for filter buttons (copied from Home.tsx)
+  filterContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 20,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 10,
+    padding: 5,
+  },
+  filterButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 3,
+  },
+  filterButtonActive: {
+    backgroundColor: '#1E3A8A',
+  },
+  filterButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#555',
+  },
+  filterButtonTextActive: {
+    color: '#FFFFFF',
   },
 });
 

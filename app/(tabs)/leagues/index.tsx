@@ -2,7 +2,8 @@ import { Session } from '@supabase/supabase-js';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import supabase from '../../utils/supabaseClient'; // Adjusted path for (tabs) structure
+import { SafeAreaView } from 'react-native-safe-area-context';
+import supabase from '../../../utils/supabaseClient'; // Adjusted path for (tabs) structure
 
 // Define type for top-level League
 interface League {
@@ -130,37 +131,43 @@ const LeaguesScreen = () => {
   }
 
   return (
+    <SafeAreaView style={styles.safeArea}> 
     <View style={styles.container}>
-      <Text style={styles.header}>Your Leagues</Text>
-
-      {leagues.length === 0 ? (
-        <Text style={styles.noDataText}>No leagues found for your tenant. An admin needs to create one.</Text>
-      ) : (
-        <FlatList
-          data={leagues}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.leagueItem} onPress={() => handleViewDivisions(item.id)}>
-              <Text style={styles.leagueName}>{item.name}</Text>
-              <Text style={styles.leagueDetail}>Status: {item.status}</Text>
-              <Text style={styles.leagueDetail}>Start: {new Date(item.start_date).toLocaleDateString()}</Text>
-              {item.end_date && <Text style={styles.leagueDetail}>End: {new Date(item.end_date).toLocaleDateString()}</Text>}
-              <Text style={styles.viewDivisionsButtonText}>View Divisions & Standings</Text>
-            </TouchableOpacity>
-          )}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
-      )}
+    <Text style={styles.header}>Your Leagues</Text>
+    
+    {leagues.length === 0 ? (
+    <Text style={styles.noDataText}>No leagues found for your tenant. An admin needs to create one.</Text>
+    ) : (
+    <FlatList
+    data={leagues}
+    keyExtractor={(item) => item.id}
+    renderItem={({ item }) => (
+    <TouchableOpacity style={styles.leagueItem} onPress={() => handleViewDivisions(item.id)}>
+    <Text style={styles.leagueName}>{item.name}</Text>
+    <Text style={styles.leagueDetail}>Status: {item.status}</Text>
+    <Text style={styles.leagueDetail}>Start: {new Date(item.start_date).toLocaleDateString()}</Text>
+    {item.end_date && <Text style={styles.leagueDetail}>End: {new Date(item.end_date).toLocaleDateString()}</Text>}
+    <Text style={styles.viewDivisionsButtonText}>View Divisions & Standings</Text>
+    </TouchableOpacity>
+    )}
+    ItemSeparatorComponent={() => <View style={styles.separator} />}
+    />
+    )}
     </View>
-  );
+    </SafeAreaView>
+    );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: { // Add this style for SafeAreaView
     flex: 1,
-    padding: 20,
-    backgroundColor: '#F5F5F5',
-  },
+    backgroundColor: '#F5F5F5', // Match your container background
+    },
+    container: {
+    flex: 1,
+    paddingHorizontal: 20, // Adjust padding if needed, SafeAreaView handles top/bottom
+    paddingTop: 10, // Add a bit of padding below the header if needed
+    },
   detailText: { // ADD THIS STYLE
     fontSize: 16,
     color: '#555',
